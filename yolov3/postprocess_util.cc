@@ -239,7 +239,7 @@ void yolov3_result(int num, float thresh, box *boxes, float **probs, int classes
     dectout->detNum = detect_num;
 }
 
-int yolo_v3_post_process_onescale(float *predictions, int input_size[3] , float *biases, box *boxes, float **pprobs, float threshold_in)
+int yolo_v3_post_process_onescale(float *predictions, int input_size[3] , float *biases, box *boxes, float **pprobs, float threshold_in, int *yolov3_box_num_after_filter)
 {
     int i,j;
     int num_class = 80;
@@ -290,6 +290,7 @@ int yolo_v3_post_process_onescale(float *predictions, int input_size[3] , float 
 
             if (scale>threshold)
             {
+                (*yolov3_box_num_after_filter)++;
                 for (j = 0; j < num_class; ++j)
                 {
                     float prob = scale*predictions[class_index+j];
@@ -312,8 +313,9 @@ void yolov3_postprocess(float **predictions, int width, int height, int modelWid
     nn_channel = 3;
     (void)nn_channel;
     int size[3]={nn_width/32, nn_height/32,85*3};
+    int yolov3_box_num_after_filter = 0;
 
-    int j;
+    int j, k, index;
     int num_class = 80;
     float threshold = 0.3;
     float iou_threshold = 0.4;
@@ -328,12 +330,33 @@ void yolov3_postprocess(float **predictions, int width, int height, int modelWid
     box *boxes = (box *)calloc(box1*(1+4+16), sizeof(box));
     float **probs = (float **)calloc(box1*(1+4+16), sizeof(float *));
 
-    yolo_v3_post_process_onescale(predictions[2], size, &biases[12], boxes, &probs[0], threshold); //特征图信息转换为框及置信度信息
-    yolo_v3_post_process_onescale(predictions[1], size2, &biases[6], &boxes[box1], &probs[box1], threshold);
-    yolo_v3_post_process_onescale(predictions[0], size4, &biases[0],  &boxes[box1*(1+4)], &probs[box1*(1+4)], threshold);
-    do_nms_sort(boxes, probs, box1*21, num_class, iou_threshold); //非极大值抑制，去除多余的框
+    yolo_v3_post_process_onescale(predictions[2], size, &biases[12], boxes, &probs[0], threshold, &yolov3_box_num_after_filter);
+    yolo_v3_post_process_onescale(predictions[1], size2, &biases[6], &boxes[box1], &probs[box1], threshold, &yolov3_box_num_after_filter);
+    yolo_v3_post_process_onescale(predictions[0], size4, &biases[0],  &boxes[box1*(1+4)], &probs[box1*(1+4)], threshold, &yolov3_box_num_after_filter);
 
-    yolov3_result(box1*21, threshold, boxes, probs, num_class, dectout);//将结果回填至上层传下来的dectout中
+    box *tmp_boxes = (box *)calloc(yolov3_box_num_after_filter, sizeof(box));
+    float **tmp_probs = (float **)calloc(yolov3_box_num_after_filter, sizeof(float *));
+
+    for (k = 0; k < yolov3_box_num_after_filter; k++)
+    {
+	tmp_probs[k] = (float *)calloc(num_class+1, sizeof(float *));
+    }
+    for (index = 0, k = 0; index < box1*(1+4+16); index++)
+    {
+	if ((fabs(boxes[index].prob_obj)-0) > 0.000001)
+	{
+	    tmp_probs[k] = probs[index];
+	    tmp_boxes[k] = boxes[index];
+	    k++;
+	}
+    }
+
+    do_nms_sort(tmp_boxes, tmp_probs, yolov3_box_num_after_filter, num_class, iou_threshold);
+    yolov3_result(yolov3_box_num_after_filter, threshold, tmp_boxes, tmp_probs, num_class, dectout);
+    free(tmp_boxes);
+    tmp_boxes = NULL;
+    free(tmp_probs);
+    tmp_probs = NULL;
 
     for (j = 0; j < box1*(1+4+16); ++j)
     {
