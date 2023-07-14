@@ -81,6 +81,17 @@ typedef struct __nn_obj_detect
     detBox *pBox;
 }obj_detect_out_t;
 
+typedef struct __nn_face_detect
+{
+    unsigned int  detNum;
+    detBox *pBox;
+    point_t *point_1;
+    point_t *point_2;
+    point_t *point_3;
+    point_t *point_4;
+    point_t *point_5;
+}face_detect_out_t;
+
 ///////////////////////////////////////some util api///////////////////////////////////////////////
 int init_fb(void);
 void *camera_thread_func(void *arg);

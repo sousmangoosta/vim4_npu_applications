@@ -262,7 +262,7 @@ int main(int argc,char **argv)
 				break;
 
 			default:
-				printf("%s [-p picture path] [-m model path]  [-H]\n", argv[0]);
+				printf("%s [-d device] [-m model path] [-w camera width] [-h camera height]  [-H]\n", argv[0]);
 				exit(1);
 		}
 	}
