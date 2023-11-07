@@ -213,6 +213,7 @@ int main(int argc,char **argv)
 			cv::rectangle(img, rect1, { 255,0,255 }, -1);
 			cv::putText(img, name, cvPoint(left+5,top-5), cv::FONT_HERSHEY_COMPLEX, 0.5, cv::Scalar(0,0,0), 1);
 		}
+		closedir(pDir);
 		cv::imwrite("output.bmp", img);
 	}
 	else
@@ -289,6 +290,7 @@ int main(int argc,char **argv)
   				outfile.close();
   			}
   		}
+  		closedir(pDir);
 	}
 	
 	ret = destroy_retinaface_network(retinaface_context);

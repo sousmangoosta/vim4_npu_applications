@@ -128,22 +128,55 @@ int main(int argc,char **argv)
 		x_padding = device_default_width - device_default_height;
 	}
 	
-	cv::namedWindow("Image Window");
+	std::string face_lib = "../face_feature_lib/";
+  	DIR *pDir;
+  	struct dirent *ptr;
+  	if (!(pDir = opendir(face_lib.c_str())))
+  	{
+  		printf("Feature library doesn't Exist!\n");
+  		return -1;
+  	}
+  	
+  	std::vector<std::string> face_name;
+  	int lib_len = 0;
+  	while ((ptr = readdir(pDir)) != 0)
+	{
+		if (strcmp(ptr->d_name, ".") != 0 && strcmp(ptr->d_name, "..") != 0)
+		{
+			lib_len++;
+		}
+	}
+	closedir(pDir);
+	
+	pDir = opendir(face_lib.c_str());
+	float face_feature[lib_len][128] = {0};
+	int i = 0;
+  	while ((ptr = readdir(pDir)) != 0)
+	{
+		if (strcmp(ptr->d_name, ".") != 0 && strcmp(ptr->d_name, "..") != 0)
+		{
+			std::ifstream infile(face_lib + ptr->d_name);
+  			std::string tmp;
+  			int j = 0;
+  			while (getline(infile, tmp))
+  			{
+  				face_feature[i][j] = atof(tmp.c_str());
+  				j++;
+  			}
+  			infile.close();
+  			face_name.push_back(((std::string)ptr->d_name).substr(0, ((std::string)ptr->d_name).find_last_of(".")));
+  			i++;
+  		}
+  	}
+  	closedir(pDir);
+  	
+  	cv::namedWindow("Image Window");
   	
   	while(1) {
 		if (!cap.read(img)) {
 			std::cout<<"Capture read error"<<std::endl;
 			break;
 		}
-		
-		std::string face_lib = "../face_feature_lib/";
-  		DIR *pDir;
-  		struct dirent *ptr;
-  		if (!(pDir = opendir(face_lib.c_str())))
-  		{
-  			printf("Feature library doesn't Exist!\n");
-  			return -1;
-  		}
 	
 		ret = set_retinaface_input(retinaface_context, img, retinaface_input_width, retinaface_input_high, input_channel);
 		ret = run_retinaface_network(retinaface_context, retinaface_detect_out);
@@ -179,29 +212,14 @@ int main(int argc,char **argv)
   		
   			float max_score = 0;
   			std::string name = "stanger";
-  			while ((ptr = readdir(pDir)) != 0)
+  			float cos_similar;
+  			for (int j = 0; j < lib_len; j++)
   			{
-  				if (strcmp(ptr->d_name, ".") != 0 && strcmp(ptr->d_name, "..") != 0)
+  				cos_similar = cos_similarity(facenet_result, face_feature[j]);
+  				if (cos_similar >= facenet_threshold && cos_similar > max_score)
   				{
-  					std::ifstream infile(face_lib + ptr->d_name);
-  					std::string tmp;
-  					float lib_feature[128];
-  					float cos_similar;
-  				
-  					int i = 0;
-  					while (getline(infile, tmp))
-  					{
-  						lib_feature[i] = atof(tmp.c_str());
-  						i++;
-  					}
-  					infile.close();
-  				
-  					cos_similar = cos_similarity(facenet_result, lib_feature);
-  					if (cos_similar >= facenet_threshold && cos_similar > max_score)
-  					{
-  						max_score = cos_similar;
-  						name = ((std::string)ptr->d_name).substr(0, ((std::string)ptr->d_name).find_last_of("."));
-  					}
+  					max_score = cos_similar;
+  					name = face_name[j];
   				}
   			}
 	
